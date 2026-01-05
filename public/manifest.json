@@ -1,0 +1,8 @@
+{
+  "short_name": "AssignmentApp",
+  "name": "Assignment Workflow Portal",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff"
+}
