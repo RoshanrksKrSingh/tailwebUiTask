@@ -3,13 +3,12 @@ import axios from 'axios';
 
 const API_URL = 'http://localhost:5000/api';
 
-// Helper to get token safely
 const getConfig = (thunkAPI) => {
   const token = thunkAPI.getState().auth.user?.token;
   return { headers: { Authorization: `Bearer ${token}` } };
 };
 
-// --- EXISTING THUNKS ---
+// --- THUNKS ---
 
 export const fetchAssignments = createAsyncThunk('assignments/getAll', async (status, thunkAPI) => {
   try {
@@ -17,7 +16,7 @@ export const fetchAssignments = createAsyncThunk('assignments/getAll', async (st
     const response = await axios.get(url, getConfig(thunkAPI));
     return response.data;
   } catch (error) {
-    return thunkAPI.rejectWithValue(error.response?.data?.message || 'Failed to fetch assignments');
+    return thunkAPI.rejectWithValue(error.response?.data?.message);
   }
 });
 
@@ -26,7 +25,7 @@ export const createAssignment = createAsyncThunk('assignments/create', async (da
     const response = await axios.post(`${API_URL}/assignments`, data, getConfig(thunkAPI));
     return response.data;
   } catch (error) {
-    return thunkAPI.rejectWithValue(error.response?.data?.message || 'Failed to create assignment');
+    return thunkAPI.rejectWithValue(error.response?.data?.message);
   }
 });
 
@@ -35,7 +34,25 @@ export const updateStatus = createAsyncThunk('assignments/updateStatus', async (
     const response = await axios.put(`${API_URL}/assignments/${id}/status`, { status }, getConfig(thunkAPI));
     return response.data;
   } catch (error) {
-    return thunkAPI.rejectWithValue(error.response?.data?.message || 'Failed to update status');
+    return thunkAPI.rejectWithValue(error.response?.data?.message);
+  }
+});
+
+export const editAssignment = createAsyncThunk('assignments/edit', async ({id, data}, thunkAPI) => {
+  try {
+    const response = await axios.put(`${API_URL}/assignments/${id}`, data, getConfig(thunkAPI));
+    return response.data;
+  } catch (error) {
+    return thunkAPI.rejectWithValue(error.response?.data?.message);
+  }
+});
+
+export const deleteAssignment = createAsyncThunk('assignments/delete', async (id, thunkAPI) => {
+  try {
+    await axios.delete(`${API_URL}/assignments/${id}`, getConfig(thunkAPI));
+    return id; 
+  } catch (error) {
+    return thunkAPI.rejectWithValue(error.response?.data?.message);
   }
 });
 
@@ -44,78 +61,56 @@ export const submitAssignment = createAsyncThunk('assignments/submit', async (da
     const response = await axios.post(`${API_URL}/submissions`, data, getConfig(thunkAPI));
     return response.data;
   } catch (error) {
-    return thunkAPI.rejectWithValue(error.response?.data?.message || 'Failed to submit assignment');
+    return thunkAPI.rejectWithValue(error.response?.data?.message);
   }
 });
 
-
-
-//  Fetch Submissions for a specific assignment
 export const fetchSubmissions = createAsyncThunk('assignments/fetchSubmissions', async (assignmentId, thunkAPI) => {
   try {
     const response = await axios.get(`${API_URL}/submissions/${assignmentId}`, getConfig(thunkAPI));
     return response.data;
   } catch (error) {
-    return thunkAPI.rejectWithValue(error.response?.data?.message || 'Failed to fetch submissions');
+    return thunkAPI.rejectWithValue(error.response?.data?.message);
   }
 });
 
-//  Mark a submission for REDO
-export const markRedo = createAsyncThunk('assignments/markRedo', async (submissionId, thunkAPI) => {
+// NEW: Mark Reviewed
+export const markReviewed = createAsyncThunk('assignments/markReviewed', async (submissionId, thunkAPI) => {
   try {
-    const response = await axios.put(`${API_URL}/submissions/${submissionId}/status`, { status: 'REDO_REQUESTED' }, getConfig(thunkAPI));
+    const response = await axios.put(`${API_URL}/submissions/${submissionId}/review`, {}, getConfig(thunkAPI));
     return response.data;
   } catch (error) {
-    return thunkAPI.rejectWithValue(error.response?.data?.message || 'Failed to mark redo');
+    return thunkAPI.rejectWithValue(error.response?.data?.message);
   }
 });
 
 const assignmentSlice = createSlice({
   name: 'assignments',
-  initialState: { 
-    items: [], 
-    submissions: [], 
-    isLoading: false, 
-    isError: false, 
-    message: '' 
-  },
+  initialState: { items: [], submissions: [], isLoading: false, isError: false, message: '' },
   extraReducers: (builder) => {
     builder
-      // Fetch Assignments
-      .addCase(fetchAssignments.pending, (state) => { state.isLoading = true; })
       .addCase(fetchAssignments.fulfilled, (state, action) => {
-        state.isLoading = false;
         state.items = action.payload;
-      })
-      .addCase(fetchAssignments.rejected, (state, action) => {
         state.isLoading = false;
-        state.isError = true;
-        state.message = action.payload;
       })
-      // Create
       .addCase(createAssignment.fulfilled, (state, action) => {
         state.items.unshift(action.payload);
       })
-      // Update Assignment Status
       .addCase(updateStatus.fulfilled, (state, action) => {
         const index = state.items.findIndex(a => a._id === action.payload._id);
         if(index !== -1) state.items[index] = action.payload;
       })
-      // Submit
-      .addCase(submitAssignment.rejected, (state, action) => {
-        state.isError = true;
-        state.message = action.payload;
+      .addCase(editAssignment.fulfilled, (state, action) => {
+        const index = state.items.findIndex(a => a._id === action.payload._id);
+        if(index !== -1) state.items[index] = action.payload;
       })
-      
-      
-      
-      // Fetch Submissions
+      .addCase(deleteAssignment.fulfilled, (state, action) => {
+        state.items = state.items.filter(a => a._id !== action.payload);
+      })
       .addCase(fetchSubmissions.fulfilled, (state, action) => {
-        state.submissions = action.payload; // Store fetched submissions
+        state.submissions = action.payload;
       })
-      // Mark Redo
-      .addCase(markRedo.fulfilled, (state, action) => {
-        // Update the specific submission in the list to show 'REDO_REQUESTED'
+      .addCase(markReviewed.fulfilled, (state, action) => {
         const index = state.submissions.findIndex(s => s._id === action.payload._id);
         if(index !== -1) state.submissions[index] = action.payload;
       });
